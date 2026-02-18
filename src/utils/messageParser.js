@@ -29,6 +29,21 @@ function parseWebhookEvent(payload) {
 
     const messagingEvent = entry.messaging[0];
     
+    // Log the event type for debugging
+    const eventType = messagingEvent.message ? 'message' : 
+                     messagingEvent.read ? 'read' :
+                     messagingEvent.delivery ? 'delivery' :
+                     messagingEvent.postback ? 'postback' : 'unknown';
+    
+    // Check if this is a message event (not read receipt, delivery, etc.)
+    if (!messagingEvent.message) {
+      // This is not a message event (could be read, delivery, postback, etc.)
+      logger.debug(`Ignoring non-message event: ${eventType}`);
+      return null;
+    }
+
+    const message = messagingEvent.message;
+    
     // Extract sender ID
     if (!messagingEvent.sender || !messagingEvent.sender.id) {
       return null;
@@ -40,13 +55,6 @@ function parseWebhookEvent(payload) {
       return null;
     }
     const timestamp = messagingEvent.timestamp;
-
-    // Check if message object exists
-    if (!messagingEvent.message) {
-      return null;
-    }
-
-    const message = messagingEvent.message;
 
     // Extract message ID
     if (!message.mid) {
