@@ -37,21 +37,31 @@ function parseWebhookEvent(payload) {
     if (entry.messaging && Array.isArray(entry.messaging) && entry.messaging.length > 0) {
       messagingEvent = entry.messaging[0];
       
-      // Log the event type for debugging
-      const eventType = messagingEvent.message ? 'message' : 
-                       messagingEvent.read ? 'read' :
-                       messagingEvent.delivery ? 'delivery' :
-                       messagingEvent.postback ? 'postback' : 'unknown';
-      
-      // Check if this is a message event (not read receipt, delivery, etc.)
-      if (!messagingEvent.message) {
+      // Check for regular message
+      if (messagingEvent.message) {
+        message = messagingEvent.message;
+        senderId = messagingEvent.sender?.id;
+        timestamp = messagingEvent.timestamp;
+      }
+      // Check for edited message
+      else if (messagingEvent.message_edit) {
+        message = {
+          mid: messagingEvent.message_edit.mid,
+          text: messagingEvent.message_edit.text,
+          attachments: messagingEvent.message_edit.attachments
+        };
+        senderId = messagingEvent.sender?.id;
+        timestamp = messagingEvent.timestamp;
+        logger.debug('Processing edited message');
+      }
+      // Check for other event types (read, delivery, etc.)
+      else {
+        const eventType = messagingEvent.read ? 'read' :
+                         messagingEvent.delivery ? 'delivery' :
+                         messagingEvent.postback ? 'postback' : 'unknown';
         logger.debug(`Ignoring non-message event: ${eventType}`);
         return null;
       }
-      
-      message = messagingEvent.message;
-      senderId = messagingEvent.sender?.id;
-      timestamp = messagingEvent.timestamp;
     }
     // Try Format 2: changes array
     else if (entry.changes && Array.isArray(entry.changes) && entry.changes.length > 0) {
