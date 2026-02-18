@@ -130,8 +130,8 @@ async function processWebhookEvent(payload) {
   let senderId = 'unknown';
   
   try {
-    // Log received event
-    logger.debug('Received webhook event');
+    // Log received event with full payload for debugging
+    logger.debug('Received webhook event', { payload: JSON.stringify(payload) });
     
     // 1. Parse webhook event
     const { parseWebhookEvent } = require('../utils/messageParser');
