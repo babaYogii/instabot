@@ -52,7 +52,12 @@ function parseWebhookEvent(payload) {
         };
         senderId = messagingEvent.sender?.id;
         timestamp = messagingEvent.timestamp;
-        logger.debug('Processing edited message');
+        logger.debug('Processing edited message', { 
+          hasSender: !!messagingEvent.sender,
+          senderId: senderId,
+          entryId: entry.id,
+          messagingEvent: JSON.stringify(messagingEvent)
+        });
       }
       // Check for other event types (read, delivery, etc.)
       else {
