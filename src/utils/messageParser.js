@@ -17,63 +17,79 @@ const logger = require('./logger');
  */
 function parseWebhookEvent(payload) {
   try {
-    // Navigate Instagram's nested JSON structure: entry[0].messaging[0]
+    // Validate basic payload structure
     if (!payload || !payload.entry || !Array.isArray(payload.entry) || payload.entry.length === 0) {
       return null;
     }
 
     const entry = payload.entry[0];
-    if (!entry.messaging || !Array.isArray(entry.messaging) || entry.messaging.length === 0) {
-      return null;
-    }
-
-    const messagingEvent = entry.messaging[0];
     
-    // Log the event type for debugging
-    const eventType = messagingEvent.message ? 'message' : 
-                     messagingEvent.read ? 'read' :
-                     messagingEvent.delivery ? 'delivery' :
-                     messagingEvent.postback ? 'postback' : 'unknown';
+    // Instagram can send two different formats:
+    // Format 1: entry[0].messaging[0] (older format)
+    // Format 2: entry[0].changes[0].value (newer format)
     
-    // Check if this is a message event (not read receipt, delivery, etc.)
-    if (!messagingEvent.message) {
-      // This is not a message event (could be read, delivery, postback, etc.)
-      logger.debug(`Ignoring non-message event: ${eventType}`);
-      return null;
-    }
-
-    const message = messagingEvent.message;
+    let messagingEvent = null;
+    let senderId = null;
+    let timestamp = null;
+    let message = null;
     
-    // Extract sender ID
-    if (!messagingEvent.sender || !messagingEvent.sender.id) {
+    // Try Format 1: messaging array
+    if (entry.messaging && Array.isArray(entry.messaging) && entry.messaging.length > 0) {
+      messagingEvent = entry.messaging[0];
+      
+      // Log the event type for debugging
+      const eventType = messagingEvent.message ? 'message' : 
+                       messagingEvent.read ? 'read' :
+                       messagingEvent.delivery ? 'delivery' :
+                       messagingEvent.postback ? 'postback' : 'unknown';
+      
+      // Check if this is a message event (not read receipt, delivery, etc.)
+      if (!messagingEvent.message) {
+        logger.debug(`Ignoring non-message event: ${eventType}`);
+        return null;
+      }
+      
+      message = messagingEvent.message;
+      senderId = messagingEvent.sender?.id;
+      timestamp = messagingEvent.timestamp;
+    }
+    // Try Format 2: changes array
+    else if (entry.changes && Array.isArray(entry.changes) && entry.changes.length > 0) {
+      const change = entry.changes[0];
+      
+      // Check if this is a messages field change
+      if (change.field !== 'messages' || !change.value) {
+        logger.debug(`Ignoring non-message change: ${change.field}`);
+        return null;
+      }
+      
+      const value = change.value;
+      message = value.message;
+      senderId = value.sender?.id;
+      timestamp = value.timestamp ? parseInt(value.timestamp) : null;
+    }
+    else {
+      // Neither format matched
       return null;
     }
-    const senderId = messagingEvent.sender.id;
-
-    // Extract timestamp
-    if (!messagingEvent.timestamp) {
+    
+    // Validate extracted data
+    if (!senderId || !message || !message.mid) {
       return null;
     }
-    const timestamp = messagingEvent.timestamp;
-
-    // Extract message ID
-    if (!message.mid) {
-      return null;
-    }
-    const messageId = message.mid;
-
+    
     // Extract message text (null if absent)
     const messageText = message.text || null;
-
+    
     // Check for attachments array
     const hasAttachments = Array.isArray(message.attachments) && message.attachments.length > 0;
-
+    
     return {
       senderId,
       messageText,
       hasAttachments,
       timestamp,
-      messageId
+      messageId: message.mid
     };
   } catch (error) {
     // Handle any unexpected errors gracefully
